@@ -1,0 +1,44 @@
+# Simple Makefile for building without CMake
+# Usage: make -f Makefile.simple
+
+CXX = g++
+CXXFLAGS = -std=c++17 -Wall -O2 -I./include
+LDFLAGS = 
+
+# Source files
+SOURCES = src/abi_parser.cpp \
+          src/log_decoder.cpp \
+          src/type_decoder.cpp \
+          src/utils.cpp \
+          src/keccak256_simple.cpp
+
+OBJECTS = $(SOURCES:.cpp=.o)
+
+# Targets
+all: decode_log test_decoder
+
+# Build the library
+libethereum_decoder.a: $(OBJECTS)
+	ar rcs $@ $(OBJECTS)
+
+# Build the example
+decode_log: examples/decode_log.cpp libethereum_decoder.a
+	$(CXX) $(CXXFLAGS) $< -L. -lethereum_decoder -o $@
+
+# Build the tests
+test_decoder: test/test_decoder.cpp libethereum_decoder.a
+	$(CXX) $(CXXFLAGS) $< -L. -lethereum_decoder -o $@
+
+# Compile source files
+%.o: %.cpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+# Clean build artifacts
+clean:
+	rm -f $(OBJECTS) libethereum_decoder.a decode_log test_decoder
+
+# Run tests
+test: test_decoder
+	./test_decoder
+
+.PHONY: all clean test
