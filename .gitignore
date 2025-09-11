@@ -1,0 +1,94 @@
+# Build artifacts
+build/
+cmake-build-*/
+*.o
+*.a
+*.so
+*.dylib
+*.dll
+*.exe
+
+# Compiled binaries
+decode_log
+test_decoder
+
+# CMake generated files
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+CTestTestfile.cmake
+Makefile
+install_manifest.txt
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Xcode (macOS)
+*.xcodeproj/
+*.xcworkspace/
+DerivedData/
+
+# Visual Studio (Windows)
+.vs/
+*.vcxproj*
+*.sln
+*.user
+Debug/
+Release/
+x64/
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+
+# Dependencies (if downloaded)
+include/nlohmann/json.hpp
+
+# Generated documentation
+docs/html/
+docs/latex/
+
+# Test outputs
+*.out
+test_results.xml
+
+# Coverage reports
+*.gcov
+*.gcda
+*.gcno
+coverage/
+
+# Valgrind reports
+valgrind-*.log
+
+# Core dumps
+core
+core.*
+
+# Package managers
+vcpkg_installed/
+conan/
+
+# Backup files
+*.bak
+*.backup
+
+# OS specific
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Compiler specific
+*.pdb
+*.idb
+*.ilk
+
+# Static analysis
+*.sarif
+*.plist

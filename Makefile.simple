@@ -21,8 +21,8 @@ all: decode_log test_decoder
 libethereum_decoder.a: $(OBJECTS)
 	ar rcs $@ $(OBJECTS)
 
-# Build the example
-decode_log: examples/decode_log.cpp libethereum_decoder.a
+# Build the application
+decode_log: app/decode_log.cpp libethereum_decoder.a
 	$(CXX) $(CXXFLAGS) $< -L. -lethereum_decoder -o $@
 
 # Build the tests

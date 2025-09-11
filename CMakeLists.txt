@@ -82,8 +82,8 @@ if(USE_CRYPTOPP AND CRYPTOPP_FOUND)
     target_include_directories(ethereum_decoder PUBLIC ${CRYPTOPP_INCLUDE_DIRS})
 endif()
 
-# Build examples
-add_executable(decode_log examples/decode_log.cpp)
+# Build applications
+add_executable(decode_log app/decode_log.cpp)
 target_link_libraries(decode_log ethereum_decoder)
 
 # Build tests if requested

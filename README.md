@@ -93,10 +93,86 @@ int main() {
 ### Running the Example
 
 ```bash
-./decode_log examples/erc20_abi.json
+# Use built-in example log
+./decode_log abis/erc20.json --example
+
+# Decode custom log data
+./decode_log abis/erc20.json --log-data "topics:data"
+
+# Output in JSON format (no verbose output)
+./decode_log abis/erc20.json --example --format json
+
+# Show help
+./decode_log --help
 ```
 
-This will decode a sample ERC20 Transfer event.
+**Log Data Format:**
+The `--log-data` option expects a string in the format `"topics:data"` where:
+- `topics` are comma-separated hex strings (including event signature)
+- `data` is the hex-encoded log data
+
+**Example:**
+```bash
+./decode_log abis/erc20.json --log-data \
+  "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef,0x000000000000000000000000a9d1e08c7793af67e9d92fe308d5697fb81d3e43,0x00000000000000000000000077696bb39917c91a0c3908d577d5e322095425ca:0x00000000000000000000000000000000000000000000000000000000000003e8"
+```
+
+This decodes an ERC20 Transfer event with:
+- Event signature: `0xddf252ad...` (Transfer)
+- From address: `0xa9d1e08c...` (indexed)
+- To address: `0x77696bb3...` (indexed)  
+- Amount: `0x3e8` = 1000 (non-indexed)
+
+### Output Formats
+
+The `--format` parameter controls the output format:
+
+**Human Format (default):**
+```bash
+./decode_log abis/erc20.json --example
+# Outputs verbose, human-readable format with ABI loading info
+```
+
+**JSON Format:**
+```bash
+./decode_log abis/erc20.json --example --format json
+# Outputs clean JSON with no verbose messages
+```
+
+**JSON Output Structure:**
+```json
+{
+  "eventName": "Transfer",
+  "eventSignature": "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
+  "parameters": [
+    {
+      "name": "from",
+      "type": "address", 
+      "value": "0xa9d1e08c7793af67e9d92fe308d5697fb81d3e43"
+    },
+    {
+      "name": "to",
+      "type": "address",
+      "value": "0x77696bb39917c91a0c3908d577d5e322095425ca"
+    },
+    {
+      "name": "value",
+      "type": "uint256",
+      "value": "100000"
+    }
+  ],
+  "rawLog": {
+    "topics": [
+      "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
+      "0x000000000000000000000000a9d1e08c7793af67e9d92fe308d5697fb81d3e43",
+      "0x00000000000000000000000077696bb39917c91a0c3908d577d5e322095425ca"
+    ],
+    "data": "0x00000000000000000000000000000000000000000000000000000000000186a0"
+  }
+}
+```
+
+**Note:** Only meaningful fields are included in the `rawLog`. Empty or default values (like `blockNumber: "0x0"`) are automatically excluded to keep the output clean and focused on decoding.
 
 ## API Reference
 
