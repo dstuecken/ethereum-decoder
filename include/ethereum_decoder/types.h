@@ -36,12 +36,6 @@ struct LogEntry {
     Address address;
     std::vector<Hash> topics;
     std::string data;  // Hex string
-    std::string blockNumber;
-    std::string transactionHash;
-    std::string transactionIndex;
-    std::string blockHash;
-    std::string logIndex;
-    bool removed = false;
 };
 
 using DecodedValue = std::variant<

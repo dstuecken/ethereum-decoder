@@ -47,6 +47,9 @@ set(SOURCES
     src/log_decoder.cpp
     src/type_decoder.cpp
     src/utils.cpp
+    src/arg_parser.cpp
+    src/json_decoder.cpp
+    src/log_data.cpp
 )
 
 # Check for CryptoPP

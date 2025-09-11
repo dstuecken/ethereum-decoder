@@ -90,17 +90,14 @@ int main() {
 }
 ```
 
-### Running the Example
+### Running the Decoder
 
 ```bash
-# Use built-in example log
-./decode_log abis/erc20.json --example
-
-# Decode custom log data
+# Decode log data from command line
 ./decode_log abis/erc20.json --log-data "topics:data"
 
 # Output in JSON format (no verbose output)
-./decode_log abis/erc20.json --example --format json
+./decode_log abis/erc20.json --log-data "topics:data" --format json
 
 # Show help
 ./decode_log --help
@@ -129,13 +126,13 @@ The `--format` parameter controls the output format:
 
 **Human Format (default):**
 ```bash
-./decode_log abis/erc20.json --example
+./decode_log abis/erc20.json --log-data "topics:data"
 # Outputs verbose, human-readable format with ABI loading info
 ```
 
 **JSON Format:**
 ```bash
-./decode_log abis/erc20.json --example --format json
+./decode_log abis/erc20.json --log-data "topics:data" --format json
 # Outputs clean JSON with no verbose messages
 ```
 

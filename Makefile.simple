@@ -10,7 +10,10 @@ SOURCES = src/abi_parser.cpp \
           src/log_decoder.cpp \
           src/type_decoder.cpp \
           src/utils.cpp \
-          src/keccak256_simple.cpp
+          src/arg_parser.cpp \
+          src/keccak256_simple.cpp \
+          src/json_decoder.cpp \
+          src/log_data.cpp
 
 OBJECTS = $(SOURCES:.cpp=.o)
 
