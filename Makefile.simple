@@ -18,19 +18,26 @@ SOURCES = src/abi_parser.cpp \
 OBJECTS = $(SOURCES:.cpp=.o)
 
 # Targets
-all: decode_log test_decoder
+all: bin/decode_log bin/test_decoder
+
+# Create directories
+bin:
+	mkdir -p bin
+
+lib:
+	mkdir -p lib
 
 # Build the library
-libethereum_decoder.a: $(OBJECTS)
+lib/libethereum_decoder.a: $(OBJECTS) | lib
 	ar rcs $@ $(OBJECTS)
 
 # Build the application
-decode_log: app/decode_log.cpp libethereum_decoder.a
-	$(CXX) $(CXXFLAGS) $< -L. -lethereum_decoder -o $@
+bin/decode_log: app/decode_log.cpp lib/libethereum_decoder.a | bin
+	$(CXX) $(CXXFLAGS) $< -Llib -lethereum_decoder -o $@
 
 # Build the tests
-test_decoder: test/test_decoder.cpp libethereum_decoder.a
-	$(CXX) $(CXXFLAGS) $< -L. -lethereum_decoder -o $@
+bin/test_decoder: test/test_decoder.cpp lib/libethereum_decoder.a | bin
+	$(CXX) $(CXXFLAGS) $< -Llib -lethereum_decoder -o $@
 
 # Compile source files
 %.o: %.cpp
@@ -38,10 +45,11 @@ test_decoder: test/test_decoder.cpp libethereum_decoder.a
 
 # Clean build artifacts
 clean:
-	rm -f $(OBJECTS) libethereum_decoder.a decode_log test_decoder
+	rm -f $(OBJECTS)
+	rm -rf bin lib
 
 # Run tests
-test: test_decoder
-	./test_decoder
+test: bin/test_decoder
+	./bin/test_decoder
 
-.PHONY: all clean test
+.PHONY: all clean test bin lib

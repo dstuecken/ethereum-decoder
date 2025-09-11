@@ -1,16 +1,13 @@
 # Build artifacts
 build/
+bin/
+lib/
 cmake-build-*/
 *.o
-*.a
 *.so
 *.dylib
 *.dll
 *.exe
-
-# Compiled binaries
-decode_log
-test_decoder
 
 # CMake generated files
 CMakeCache.txt

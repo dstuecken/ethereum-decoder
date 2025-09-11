@@ -75,6 +75,12 @@ endif()
 # Create library
 add_library(ethereum_decoder STATIC ${SOURCES})
 
+# Set output directory specifically for this target
+set_target_properties(ethereum_decoder PROPERTIES
+    ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/lib
+    LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/lib
+)
+
 # Link libraries
 if(USE_SYSTEM_JSON AND nlohmann_json_FOUND)
     target_link_libraries(ethereum_decoder nlohmann_json::nlohmann_json)
@@ -84,6 +90,19 @@ if(USE_CRYPTOPP AND CRYPTOPP_FOUND)
     target_link_libraries(ethereum_decoder ${CRYPTOPP_LIBRARIES})
     target_include_directories(ethereum_decoder PUBLIC ${CRYPTOPP_INCLUDE_DIRS})
 endif()
+
+# Set output directories for all configurations
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/bin)
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/lib)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/lib)
+
+# Also set for multi-config generators (like Visual Studio)
+foreach(OUTPUTCONFIG ${CMAKE_CONFIGURATION_TYPES})
+    string(TOUPPER ${OUTPUTCONFIG} OUTPUTCONFIG)
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_${OUTPUTCONFIG} ${CMAKE_CURRENT_SOURCE_DIR}/bin)
+    set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_${OUTPUTCONFIG} ${CMAKE_CURRENT_SOURCE_DIR}/lib)
+    set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_${OUTPUTCONFIG} ${CMAKE_CURRENT_SOURCE_DIR}/lib)
+endforeach()
 
 # Build applications
 add_executable(decode_log app/decode_log.cpp)
