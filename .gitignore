@@ -68,9 +68,11 @@ valgrind-*.log
 core
 core.*
 
-# Package managers
-vcpkg_installed/
+# Package managers  
 conan/
+
+# Manual dependencies
+deps/
 
 # Backup files
 *.bak

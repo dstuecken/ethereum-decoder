@@ -1,0 +1,123 @@
+# Makefile for building with manually installed dependencies
+# Usage: make -f Makefile.manual
+
+CXX = g++
+
+# Detect OpenSSL path (macOS Homebrew vs system)
+OPENSSL_PREFIX := $(shell brew --prefix openssl 2>/dev/null || echo /usr/local)
+
+# Manual dependency paths
+DEPS_DIR = deps
+SPDLOG_DIR = $(DEPS_DIR)/spdlog
+NLOHMANN_JSON_DIR = $(DEPS_DIR)/nlohmann-json
+CLICKHOUSE_CPP_DIR = $(DEPS_DIR)/clickhouse-cpp
+ABSEIL_DIR = $(DEPS_DIR)/abseil-cpp
+
+CXXFLAGS = -std=c++17 -Wall -O2 -I./include \
+           -I$(SPDLOG_DIR)/include \
+           -I$(NLOHMANN_JSON_DIR)/include \
+           -I$(CLICKHOUSE_CPP_DIR) \
+           -I$(ABSEIL_DIR) \
+           -I$(OPENSSL_PREFIX)/include
+
+LDFLAGS = -L$(SPDLOG_DIR)/build -lspdlog \
+          -L$(CLICKHOUSE_CPP_DIR)/build/clickhouse -lclickhouse-cpp-lib \
+          -L$(CLICKHOUSE_CPP_DIR)/build/contrib/lz4/lz4 -llz4 \
+          -L$(CLICKHOUSE_CPP_DIR)/build/contrib/zstd/zstd -lzstdstatic \
+          -L$(CLICKHOUSE_CPP_DIR)/build/contrib/cityhash/cityhash -lcityhash \
+          -L$(OPENSSL_PREFIX)/lib -lssl -lcrypto \
+          -pthread
+
+# Source files
+SOURCES = src/abi_parser.cpp \
+          src/log_decoder.cpp \
+          src/type_decoder.cpp \
+          src/utils.cpp \
+          src/arg_parser.cpp \
+          src/keccak256_simple.cpp \
+          src/json_decoder.cpp \
+          src/log_data.cpp \
+          src/clickhouse_args.cpp \
+          src/clickhouse_client.cpp \
+          src/clickhouse_ethereum.cpp \
+          src/clickhouse_query_config.cpp \
+          src/progress_display.cpp
+
+OBJECTS = $(SOURCES:.cpp=.o)
+
+# Targets
+all: check_deps bin/decode_log bin/test_decoder bin/decode_clickhouse
+
+# Check if dependencies are built
+check_deps:
+	@echo "Checking dependencies..."
+	@if [ ! -f "$(SPDLOG_DIR)/build/libspdlog.a" ]; then \
+		echo "❌ spdlog not built. Run ./install_dependencies.sh first"; \
+		exit 1; \
+	fi
+	@if [ ! -f "$(CLICKHOUSE_CPP_DIR)/build/libclickhouse-cpp-lib.a" ]; then \
+		echo "❌ clickhouse-cpp not built. Run ./install_dependencies.sh first"; \
+		exit 1; \
+	fi
+	@if [ ! -d "$(NLOHMANN_JSON_DIR)/include" ]; then \
+		echo "❌ nlohmann-json not found. Run ./install_dependencies.sh first"; \
+		exit 1; \
+	fi
+	@echo "✅ All dependencies found"
+
+# Create directories
+bin:
+	mkdir -p bin
+
+lib:
+	mkdir -p lib
+
+# Build the library
+lib/libethereum_decoder.a: $(OBJECTS) | lib
+	ar rcs $@ $(OBJECTS)
+
+# Build the application
+bin/decode_log: app/decode_log.cpp lib/libethereum_decoder.a | bin
+	$(CXX) $(CXXFLAGS) $< -Llib -lethereum_decoder -o $@
+
+# Build the tests
+bin/test_decoder: test/test_decoder.cpp lib/libethereum_decoder.a | bin
+	$(CXX) $(CXXFLAGS) $< -Llib -lethereum_decoder -o $@
+
+# Build the ClickHouse decoder
+bin/decode_clickhouse: app/decode_clickhouse.cpp lib/libethereum_decoder.a | bin
+	$(CXX) $(CXXFLAGS) $< -Llib -lethereum_decoder $(LDFLAGS) -o $@
+
+# Compile source files
+%.o: %.cpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+# Clean build artifacts only
+clean:
+	./clean.sh
+
+# Clean everything including dependencies
+clean-all:
+	./clean.sh --deps
+
+# Clean only dependencies (keep build artifacts)  
+clean-deps:
+	./clean.sh --deps-only
+
+# Run tests
+test: bin/test_decoder
+	./bin/test_decoder
+
+# Debug info
+debug:
+	@echo "Manual dependency locations:"
+	@echo "  spdlog: $(SPDLOG_DIR)"
+	@echo "  nlohmann-json: $(NLOHMANN_JSON_DIR)"
+	@echo "  clickhouse-cpp: $(CLICKHOUSE_CPP_DIR)"
+	@echo "  OpenSSL: $(OPENSSL_PREFIX)"
+	@echo ""
+	@echo "CXXFLAGS: $(CXXFLAGS)"
+	@echo ""
+	@echo "LDFLAGS: $(LDFLAGS)"
+
+.PHONY: all clean clean-all clean-deps test debug bin lib check_deps

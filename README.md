@@ -1,237 +1,287 @@
 # Ethereum Log Decoder (C++)
 
-A C++ library for decoding Ethereum event logs using ABI (Application Binary Interface) files. This library can parse contract ABIs and decode raw log data into human-readable format, similar to what ethers.js or web3.js do in JavaScript.
+A high-performance C++ library and applications for decoding Ethereum event logs using ABI (Application Binary Interface) files. This project provides both a core decoding library and two specialized applications for different use cases.
 
-## Features
+## Project Structure
 
-- Parse JSON ABI files
-- Decode Ethereum event logs
-- Support for all common Solidity types:
-  - Basic types: address, uint256, int256, bool
-  - Fixed-size bytes: bytes1 to bytes32
-  - Dynamic types: bytes, string
-  - Arrays (fixed and dynamic)
-- Built-in Keccak256 hashing for event signatures
-- No external dependencies except nlohmann/json (fetched automatically)
+This project consists of:
 
-## Building
+### 1. **ethereum_decoder** (Core Library)
+- **Location**: `app/ethereum_decoder/`
+- **Purpose**: Core library providing Ethereum log decoding functionality
+- **Features**:
+  - ABI parsing from JSON files
+  - Event log decoding with full Solidity type support
+  - Keccak256 hashing for event signatures
+  - Type decoding for all Ethereum ABI types
+- **Build Output**: `lib/libethereum_decoder.a`
+
+### 2. **decode_log** (CLI Application)
+- **Location**: `app/decode_log/`
+- **Purpose**: Command-line tool for decoding individual Ethereum logs
+- **Features**:
+  - Decode single logs from command-line input
+  - Support for human-readable and JSON output formats
+  - Quick testing and debugging of log data or use within scripts
+- **Build Output**: `bin/decode_log`
+
+### 3. **decode_clickhouse** (Streaming Application)
+- **Location**: `app/decode_clickhouse/`
+- **Purpose**: High-performance streaming processor for bulk log decoding
+- **Features**:
+  - Stream logs directly from ClickHouse database
+  - Parallel processing with configurable worker threads
+  - Output to Parquet files (with Apache Arrow) or JSON
+  - Optional direct insertion back to ClickHouse
+  - Real-time progress tracking
+  - Comprehensive logging with configurable verbosity
+- **Build Output**: `bin/decode_clickhouse`
+
+## Building the Project
 
 ### Prerequisites
 
-- CMake 3.14 or higher
-- C++17 compatible compiler
+- C++17 compatible compiler (GCC 7+, Clang 6+)
 - Git (for fetching dependencies)
+- (Optional) Apache Arrow for Parquet support: `brew install apache-arrow`
+- (Optional) ClickHouse C++ client dependencies
 
-### Build Instructions
-
-#### Option 1: CMake (Recommended)
-```bash
-mkdir build
-cd build
-cmake ..
-make
-```
-
-#### Option 2: Simple Makefile (No CMake required)
-```bash
-# Download dependencies first
-./fetch_dependencies.sh
-
-# Build using simple Makefile
-make -f Makefile.simple
-```
-
-This will build:
-- `libethereum_decoder.a` - Static library
-- `decode_log` - Example application
-- `test_decoder` - Test suite
-
-### Build Options
-
-- `BUILD_TESTS` - Build test programs (default: ON)
-- `USE_CRYPTOPP` - Use CryptoPP for Keccak256 if available (default: OFF)
-
-## Usage
-
-### Basic Example
-
-```cpp
-#include "ethereum_decoder/abi_parser.h"
-#include "ethereum_decoder/log_decoder.h"
-
-using namespace ethereum_decoder;
-
-int main() {
-    // Parse ABI from file
-    ABIParser parser;
-    auto abi = parser.parseFromFile("erc20_abi.json");
-    
-    // Create decoder
-    LogDecoder decoder(std::move(abi));
-    
-    // Create log entry
-    LogEntry log;
-    log.topics.push_back("0xddf252ad..."); // Event signature
-    log.topics.push_back("0x00000000..."); // from address
-    log.topics.push_back("0x00000000..."); // to address
-    log.data = "0x00000000..."; // value
-    
-    // Decode the log
-    auto decodedLog = decoder.decodeLog(log);
-    
-    // Access decoded data
-    std::cout << "Event: " << decodedLog->eventName << std::endl;
-    for (const auto& param : decodedLog->params) {
-        std::cout << param.name << ": ";
-        // Print param.value based on its type
-    }
-    
-    return 0;
-}
-```
-
-### Running the Decoder
+### Quick Start
 
 ```bash
-# Decode log data from command line
-./decode_log abis/erc20.json --log-data "topics:data"
+# 1. Clone the repository
+git clone git@github.com:dstuecken/ethereum-decoder.git
+cd ethereum-decoder
 
-# Output in JSON format (no verbose output)
-./decode_log abis/erc20.json --log-data "topics:data" --format json
+# 2. Install dependencies
+./install_dependencies.sh
+
+# 3. Build all components (library + both applications)
+# Build individual components:
+./make_ethereum_decoder_lib.sh    # Build core library
+./make_decode_log.sh              # Build decode_log application
+ENABLE_PARQUET=1 ./make_decode_clickhouse.sh  # Build decode_clickhouse with Parquet
+```
+
+### Individual Build Scripts
+
+Build specific components:
+
+```bash
+# Build only the core library
+./make_ethereum_decoder_lib.sh
+
+# Build only decode_log application (auto-builds library if needed)
+./make_decode_log.sh
+
+# Build only decode_clickhouse application (auto-builds library if needed)
+ENABLE_PARQUET=1 ./make_decode_clickhouse.sh  # With Parquet support
+./make_decode_clickhouse.sh                    # Without Parquet (JSON only)
+```
+
+### Build Output
+
+After building, you'll find:
+```
+ethereum-decoder/
+├── lib/
+│   └── libethereum_decoder.a    # Core decoding library
+├── bin/
+│   ├── decode_log               # CLI decoder application
+│   └── decode_clickhouse        # Streaming decoder application
+└── decoded_logs/                # Default output directory (created at runtime)
+```
+
+## Using the Applications
+
+### decode_log - CLI Log Decoder
+
+Decode individual Ethereum event logs from the command line.
+
+**Basic Usage:**
+```bash
+# Decode a single log
+./bin/decode_log resources/abis/erc20.json --log-data "topics:data"
+
+# Output as JSON
+./bin/decode_log resources/abis/erc20.json --log-data "topics:data" --format json
 
 # Show help
-./decode_log --help
+./bin/decode_log --help
 ```
 
-**Log Data Format:**
-The `--log-data` option expects a string in the format `"topics:data"` where:
-- `topics` are comma-separated hex strings (including event signature)
-- `data` is the hex-encoded log data
-
-**Example:**
+**Example - Decoding an ERC20 Transfer Event:**
 ```bash
-./decode_log abis/erc20.json --log-data \
-  "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef,0x000000000000000000000000a9d1e08c7793af67e9d92fe308d5697fb81d3e43,0x00000000000000000000000077696bb39917c91a0c3908d577d5e322095425ca:0x00000000000000000000000000000000000000000000000000000000000003e8"
+./bin/decode_log resources/abis/erc20.json --log-data \
+  "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef,\
+0x000000000000000000000000a9d1e08c7793af67e9d92fe308d5697fb81d3e43,\
+0x00000000000000000000000077696bb39917c91a0c3908d577d5e322095425ca:\
+0x00000000000000000000000000000000000000000000000000000000000003e8"
 ```
 
-This decodes an ERC20 Transfer event with:
-- Event signature: `0xddf252ad...` (Transfer)
-- From address: `0xa9d1e08c...` (indexed)
-- To address: `0x77696bb3...` (indexed)  
-- Amount: `0x3e8` = 1000 (non-indexed)
+**Output Formats:**
+- **human** (default): Human-readable format with detailed information
+- **json**: Clean JSON output for programmatic use
 
-### Output Formats
+### decode_clickhouse - Streaming Log Decoder
 
-The `--format` parameter controls the output format:
+Process large volumes of logs from ClickHouse with parallel processing and batch output.
 
-**Human Format (default):**
+**Basic Usage:**
 ```bash
-./decode_log abis/erc20.json --log-data "topics:data"
-# Outputs verbose, human-readable format with ABI loading info
+# Decode logs from ClickHouse and save to Parquet files
+./bin/decode_clickhouse \
+  --host clickhouse.example.com \
+  --user myuser \
+  --password mypass \
+  --database ethereum \
+  --port 8443 \
+  --blockrange 18000000-18001000 \
+  --output-dir decoded_logs
+
+# With all options
+./bin/decode_clickhouse \
+  --host localhost \
+  --user default \
+  --password '' \
+  --database ethereum \
+  --port 9440 \
+  --blockrange 1000-5000 \
+  --workers 16 \
+  --output-dir results \
+  --json \
+  --log-level debug \
+  --log-file decode.log
+
+# Insert decoded logs back to ClickHouse into decoded_logs table
+./bin/decode_clickhouse \
+  --host localhost \
+  --user default \
+  --password '' \
+  --database ethereum \
+  --port 9440 \
+  --blockrange 1000-5000 \
+  --workers 16 \
+  --insert-decoded-logs
 ```
 
-**JSON Format:**
-```bash
-./decode_log abis/erc20.json --log-data "topics:data" --format json
-# Outputs clean JSON with no verbose messages
+**Command-Line Options:**
+
+**Required:**
+- `--host <hostname>`: ClickHouse server hostname
+- `--user <username>`: ClickHouse username
+- `--password <password>`: ClickHouse password
+- `--database <database>`: ClickHouse database name
+- `--port <port>`: ClickHouse port (8443 for HTTPS, 9440 for native SSL)
+- `--blockrange <start-end>`: Block range to process (e.g., 1000-2000)
+
+**Optional:**
+- `--workers <count>`: Number of parallel workers (default: 8)
+- `--insert-decoded-logs`: Insert decoded logs back to ClickHouse
+- `--output-dir <dir>`: Output directory for files (default: decoded_logs)
+- `--json`: Force JSON output instead of Parquet
+- `--log-level <level>`: Logging verbosity: debug, info, warning, error (default: info)
+- `--log-file <path>`: Log file path (default: decode_clickhouse.log)
+- `--sql-config-dir <dir>`: Directory with custom SQL queries
+
+**Output Formats:**
+- **Parquet** (default if Apache Arrow available): One `.parquet` file per block
+- **JSON** (fallback or with --json flag): One `.json` file per block
+
+**Progress Display:**
+The application shows real-time progress:
+```
+⠋ Decoding │ Blocks: 234/1000 │ Page: 15 │ Logs: 12,345 │ Decoded: 10,234 (83.0%) │ Workers: 4 │ Time: 2m 15s
 ```
 
-**JSON Output Structure:**
-```json
-{
-  "eventName": "Transfer",
-  "eventSignature": "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
-  "parameters": [
-    {
-      "name": "from",
-      "type": "address", 
-      "value": "0xa9d1e08c7793af67e9d92fe308d5697fb81d3e43"
-    },
-    {
-      "name": "to",
-      "type": "address",
-      "value": "0x77696bb39917c91a0c3908d577d5e322095425ca"
-    },
-    {
-      "name": "value",
-      "type": "uint256",
-      "value": "100000"
-    }
-  ],
-  "rawLog": {
-    "topics": [
-      "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
-      "0x000000000000000000000000a9d1e08c7793af67e9d92fe308d5697fb81d3e43",
-      "0x00000000000000000000000077696bb39917c91a0c3908d577d5e322095425ca"
-    ],
-    "data": "0x00000000000000000000000000000000000000000000000000000000000186a0"
-  }
-}
-```
+## Library Integration
 
-**Note:** Only meaningful fields are included in the `rawLog`. Empty or default values (like `blockNumber: "0x0"`) are automatically excluded to keep the output clean and focused on decoding.
+For detailed information on using the ethereum_decoder library in your own C++ projects, see [Library Usage Guide](resources/docs/LIBRARY_USE.md).
 
-## API Reference
+## Dependencies
 
-### ABIParser
+The project uses the following dependencies (automatically installed by `install_dependencies.sh`):
 
-Parses Ethereum contract ABI from JSON format.
+- **spdlog**: Fast C++ logging library
+- **nlohmann/json**: JSON parsing and serialization
+- **ClickHouse C++ client**: For database connectivity
+- **Apache Arrow** (optional): For Parquet file support
+- **Abseil**: Required by ClickHouse client
 
-- `parseFromString(jsonStr)` - Parse ABI from JSON string
-- `parseFromFile(filePath)` - Parse ABI from JSON file
+## Performance
 
-### LogDecoder
+- **decode_log**: Instant decoding of individual logs
+- **decode_clickhouse**: 
+  - Processes thousands of logs per second
+  - Parallel processing with configurable workers
+  - Memory-efficient streaming (configurable batch sizes)
+  - Automatic chunking by block number
 
-Decodes Ethereum event logs using parsed ABI.
-
-- `decodeLog(log)` - Decode a single log entry
-- `decodeLogs(logs)` - Decode multiple log entries
-
-### TypeDecoder
-
-Low-level decoder for Ethereum ABI types.
-
-- `decodeValue(type, hexData, offset)` - Decode a single value
-- `decodeValues(types, hexData)` - Decode multiple values
-
-### Utils
-
-Utility functions for hex/byte conversions.
-
-- `hexToBytes(hex)` - Convert hex string to bytes
-- `bytesToHex(bytes)` - Convert bytes to hex string
-- `removeHexPrefix(hex)` - Remove "0x" prefix
-- `padLeft/padRight(hex, length)` - Pad hex string
-
-## Supported Types
-
-- **Basic Types**: address, bool, int8-256, uint8-256
-- **Bytes**: bytes, bytes1-32
-- **String**: string
-- **Arrays**: T[], T[n] (fixed and dynamic)
-- **Tuples**: (T1, T2, ...) - Coming soon
-
-## Architecture
-
-The decoder follows the Ethereum ABI encoding specification:
-
-1. **Event Signature**: First topic is Keccak256 hash of event signature
-2. **Indexed Parameters**: Stored in topics (max 3 indexed params)
-3. **Non-indexed Parameters**: Encoded in log data field
-4. **Dynamic Types**: Use offset-based encoding
 
 ## Testing
 
-Run the test suite:
-
+Test the applications:
 ```bash
-./test_decoder
+# Test the library by building decode_log
+./make_decode_log.sh
+
+# Test decode_log with ERC20 transfer example
+./bin/decode_log resources/abis/erc20.json --log-data \
+  "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef,0x000000000000000000000000a9d1e08c7793af67e9d92fe308d5697fb81d3e43,0x00000000000000000000000077696bb39917c91a0c3908d577d5e322095425ca:0x00000000000000000000000000000000000000000000000000000000000003e8"
+
+# Test decode_clickhouse (requires ClickHouse connection)
+./bin/decode_clickhouse --help
+```
+
+## Troubleshooting
+
+### Missing ABIs
+If decode_clickhouse reports "No ABI found for contract", ensure:
+1. ABIs are loaded in your ClickHouse database
+2. The contract addresses in logs match the ABIs
+
+### Parquet Support
+If Parquet files aren't being created:
+1. Install Apache Arrow: `brew install apache-arrow`
+2. Rebuild with: `ENABLE_PARQUET=1 ./make_decode_clickhouse.sh`
+3. Or use `--json` flag to force JSON output
+
+### OpenSSL Issues
+If you encounter OpenSSL errors during `clickhouse-cpp` build:
+```bash
+# Ensure OpenSSL is installed
+brew install openssl
+
+# Clean and rebuild if needed
+./clean.sh --deps
+./install_dependencies.sh
+```
+
+### Build Issues
+If dependencies fail to build:
+1. Ensure you have a C++17 compatible compiler (GCC 7+, Clang 6+)
+2. Run `./install_dependencies.sh` to fetch all dependencies
+3. Check `deps/` directory for successful builds
+4. Try building components individually:
+   - `./make_ethereum_decoder_lib.sh` (core library)
+   - `./make_decode_log.sh` (CLI application)
+   - `./make_decode_clickhouse.sh` (streaming application)
+
+### Cleaning Build Files
+```bash
+# Clean build artifacts only (keep dependencies)
+./clean.sh
+# or: make -f Makefile.manual clean
+
+# Clean everything including dependencies
+./clean.sh --deps
+# or: make -f Makefile.manual clean-all
+
+# Clean only dependencies (keep build files)
+./clean.sh --deps-only
+# or: make -f Makefile.manual clean-deps
 ```
 
 ## License
 
 MIT License
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit issues and pull requests.

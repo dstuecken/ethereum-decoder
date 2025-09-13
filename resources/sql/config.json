@@ -1,0 +1,15 @@
+{
+  "tables": {
+    "logs": "logs",
+    "contracts": "decoded_contracts", 
+    "decoded_logs": "decoded_logs"
+  },
+  "pagination": {
+    "page_size": 10000
+  },
+  "queries": {
+    "log_stream_file": "log_stream.sql",
+    "contract_abi_file": "contract_abi.sql",
+    "clickhouse_settings_file": "clickhouse_settings.sql"
+  }
+}
