@@ -61,7 +61,6 @@ else
     remove_dir "CMakeFiles"
     remove_file "cmake_install.cmake"
     remove_file "CTestTestfile.cmake"
-    remove_file "Makefile"
     remove_file "install_manifest.txt"
 
     # Clean IDE files
@@ -78,6 +77,11 @@ else
     echo "Cleaning log files..."
     remove_file "decode_clickhouse.log"
     remove_file "*.log"
+    
+    # Clean object files
+    echo ""
+    echo "Cleaning object files..."
+    find . -name "*.o" -type f -delete 2>/dev/null || true
 
     if [[ "$1" == "--deps" || "$1" == "--all" ]]; then
         echo ""
