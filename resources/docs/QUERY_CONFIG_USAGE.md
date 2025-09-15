@@ -4,8 +4,9 @@ The ClickHouse query system has been refactored to support configurable SQL stat
 
 ## Features
 
-- **Configurable SQL queries**: Load queries from external SQL files
-- **Configurable table names**: Easily change table names without code changes
+- **Configurable SQL queries**: Load queries from external SQL files including insert statements
+- **Configurable page size**: Set via command line with `--logs-page-size`
+- **Configurable insert statements**: Customize decoded_logs insert via SQL template
 - **Configurable ClickHouse settings**: Customize async insert settings
 - **Template system**: Support for parameterized queries
 - **Fallback to defaults**: Works without configuration files
@@ -24,24 +25,22 @@ ClickHouseClient client(config);
 ClickHouseEthereum ethereum(client, "resources/sql/");  // Loads from resources/sql/ directory
 ```
 
-### Customizing Table Names at Runtime
-```cpp
-ClickHouseClient client(config);
-ClickHouseEthereum ethereum(client);
-
-// Customize table names
-ethereum.getQueryConfig().setLogsTableName("custom_logs");
-ethereum.getQueryConfig().setContractsTableName("custom_contracts");
-ethereum.getQueryConfig().setDecodedLogsTableName("custom_decoded_logs");
+### Customizing via Command Line
+```bash
+# Set custom page size for better performance
+./bin/decode_clickhouse \
+  --logs-page-size 50000 \
+  --host myhost --user myuser --password mypass \
+  --database ethereum --blockrange 1-1000
 ```
 
-### Customizing Page Size
+### Customizing at Runtime (C++)
 ```cpp
 ClickHouseClient client(config);
 ClickHouseEthereum ethereum(client);
 
 // Change pagination size
-ethereum.getQueryConfig().setPageSize(5000);
+ethereum.getQueryConfig().setPageSize(50000);
 ```
 
 ## Configuration Files
@@ -53,7 +52,7 @@ Main query for streaming logs with pagination:
 ```sql
 SELECT transactionHash, blockHash, blockNumber, address, data, logIndex, removed,
        topic0, topic1, topic2, topic3
-FROM {LOGS_TABLE}
+FROM logs
 WHERE blockNumber >= {START_BLOCK} AND blockNumber <= {END_BLOCK}
   AND removed = 0
 ORDER BY blockNumber, logIndex
@@ -64,9 +63,23 @@ LIMIT {PAGE_SIZE} OFFSET {OFFSET}
 Query for fetching contract ABIs:
 ```sql
 SELECT ADDRESS, NAME, ABI, IMPLEMENTATION_ADDRESS
-FROM {CONTRACTS_TABLE}
+FROM decoded_contracts
 WHERE (ADDRESS IN ({ADDRESS_LIST}) OR IMPLEMENTATION_ADDRESS IN ({ADDRESS_LIST}))
   AND ABI != '' AND ABI IS NOT NULL
+```
+
+#### `resources/sql/decoded_logs_insert.sql`
+Template for inserting decoded logs:
+```sql
+INSERT INTO decoded_logs (
+    transactionHash,
+    logIndex,
+    contractAddress,
+    eventName,
+    eventSignature,
+    signature,
+    args
+) VALUES ('{transactionHash}', {logIndex}, '{contractAddress}', '{eventName}', '{eventSignature}', '{signature}', '{args}')
 ```
 
 #### `resources/sql/clickhouse_settings.sql`
@@ -84,17 +97,10 @@ SET max_insert_block_size = 100000
 #### `resources/sql/config.json`
 ```json
 {
-  "tables": {
-    "logs": "logs",
-    "contracts": "decoded_contracts", 
-    "decoded_logs": "decoded_logs"
-  },
-  "pagination": {
-    "page_size": 10000
-  },
   "queries": {
     "log_stream_file": "log_stream.sql",
     "contract_abi_file": "contract_abi.sql",
+    "decoded_logs_insert_file": "decoded_logs_insert.sql",
     "clickhouse_settings_file": "clickhouse_settings.sql"
   }
 }
@@ -105,15 +111,22 @@ SET max_insert_block_size = 100000
 The query templates support the following variables:
 
 ### Log Stream Query
-- `{LOGS_TABLE}` - Table name for logs
 - `{START_BLOCK}` - Starting block number
 - `{END_BLOCK}` - Ending block number
 - `{PAGE_SIZE}` - Number of records per page
 - `{OFFSET}` - Offset for pagination
 
 ### Contract ABI Query
-- `{CONTRACTS_TABLE}` - Table name for contracts
 - `{ADDRESS_LIST}` - Comma-separated list of contract addresses
+
+### Decoded Logs Insert Query
+- `{transactionHash}` - Transaction hash (string)
+- `{logIndex}` - Log index (numeric)
+- `{contractAddress}` - Contract address (string)
+- `{eventName}` - Event name (string)
+- `{eventSignature}` - Event signature hash (string)
+- `{signature}` - Full signature (string)
+- `{args}` - Decoded arguments JSON (string)
 
 ## Migration from Hardcoded Queries
 

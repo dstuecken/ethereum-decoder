@@ -96,25 +96,27 @@ else
 fi
 
 echo ""
-echo "Installing Apache Arrow (for parquet support)..."
+echo "Installing Apache Arrow 21.0.0 (for parquet support)..."
 if [ ! -d "arrow" ]; then
-    git clone --depth 1 --branch apache-arrow-18.1.0 https://github.com/apache/arrow.git
+    git clone --depth 1 --branch apache-arrow-21.0.0 https://github.com/apache/arrow.git
     cd arrow/cpp
     mkdir -p build
     cd build
+    # Detect OpenSSL path (macOS Homebrew vs system)
+    OPENSSL_PREFIX=${OPENSSL_PREFIX:-$(brew --prefix openssl 2>/dev/null || echo /usr/local)}
+    
+    # Build Arrow with Parquet support, bundled Thrift, and OpenSSL
+    # Using minimal dependencies to avoid build issues
     cmake .. -DCMAKE_BUILD_TYPE=Release \
              -DARROW_PARQUET=ON \
-             -DARROW_DATASET=OFF \
-             -DARROW_FILESYSTEM=OFF \
-             -DARROW_CSV=OFF \
-             -DARROW_JSON=OFF \
-             -DARROW_COMPUTE=OFF \
-             -DARROW_IPC=OFF \
+             -DPARQUET_BUILD_SHARED=OFF \
+             -DPARQUET_BUILD_EXECUTABLES=OFF \
+             -DPARQUET_BUILD_EXAMPLES=OFF \
              -DARROW_BUILD_SHARED=OFF \
              -DARROW_BUILD_STATIC=ON \
              -DARROW_BUILD_TESTS=OFF \
+             -DARROW_BUILD_INTEGRATION=OFF \
              -DARROW_BUILD_BENCHMARKS=OFF \
-             -DARROW_BUILD_EXAMPLES=OFF \
              -DARROW_WITH_SNAPPY=OFF \
              -DARROW_WITH_ZLIB=OFF \
              -DARROW_WITH_LZ4=OFF \
@@ -122,10 +124,45 @@ if [ ! -d "arrow" ]; then
              -DARROW_WITH_BROTLI=OFF \
              -DARROW_WITH_BZ2=OFF \
              -DARROW_WITH_UTF8PROC=OFF \
-             -DARROW_WITH_RE2=OFF
-    make -j4 arrow parquet
+             -DARROW_WITH_RE2=OFF \
+             -DARROW_DEPENDENCY_SOURCE=BUNDLED \
+             -DARROW_DEPENDENCY_USE_SHARED=OFF \
+             -DPARQUET_REQUIRE_ENCRYPTION=ON \
+             -DARROW_VERBOSE_THIRDPARTY_BUILD=ON \
+             -DARROW_USE_OPENSSL=ON \
+             -DOPENSSL_ROOT_DIR="$OPENSSL_PREFIX" \
+             -DOPENSSL_INCLUDE_DIR="$OPENSSL_PREFIX/include" \
+             -DOPENSSL_CRYPTO_LIBRARY="$OPENSSL_PREFIX/lib/libcrypto.a" \
+             -DOPENSSL_SSL_LIBRARY="$OPENSSL_PREFIX/lib/libssl.a"
+    
+    # Build both arrow and parquet static libraries
+    cmake --build . --config Release --target arrow_static
+    cmake --build . --config Release --target parquet_static
+    
+    # Check if libraries were built
+    echo "Checking for built libraries..."
+    if [ -f "release/libarrow.a" ]; then
+        echo "✅ libarrow.a found at release/libarrow.a"
+    else
+        echo "⚠️  libarrow.a not found in release/"
+        find . -name "libarrow.a" -type f 2>/dev/null | head -5
+    fi
+    
+    if [ -f "release/libparquet.a" ]; then
+        echo "✅ libparquet.a found at release/libparquet.a"
+    else
+        echo "⚠️  libparquet.a not found in release/"
+        echo "   Searching for libparquet.a..."
+        find . -name "libparquet.a" -type f 2>/dev/null | head -5
+    fi
+    
+    # Also check for Thrift if it was built
+    find . -name "libthrift*.a" -type f 2>/dev/null | head -2 | while read -r thrift_lib; do
+        echo "   Found Thrift: $thrift_lib"
+    done
+    
     cd ../../..
-    echo "✅ Apache Arrow built successfully"
+    echo "✅ Apache Arrow build completed"
 else
     echo "✅ Apache Arrow already exists"
 fi

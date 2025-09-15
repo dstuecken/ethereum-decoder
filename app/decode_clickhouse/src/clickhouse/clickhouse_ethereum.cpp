@@ -209,35 +209,14 @@ namespace decode_clickhouse {
                 client->Execute(setting);
             }
             
-            clickhouse::Block block;
-
-            auto txHashCol = std::make_shared<clickhouse::ColumnString>();
-            auto logIndexCol = std::make_shared<clickhouse::ColumnUInt32>();
-            auto contractAddrCol = std::make_shared<clickhouse::ColumnString>();
-            auto eventNameCol = std::make_shared<clickhouse::ColumnString>();
-            auto eventSigCol = std::make_shared<clickhouse::ColumnString>();
-            auto signatureCol = std::make_shared<clickhouse::ColumnString>();
-            auto argsCol = std::make_shared<clickhouse::ColumnString>();
-
-            for (const auto &log: decodedLogs) {
-                txHashCol->Append(log.transactionHash);
-                logIndexCol->Append(log.logIndex);
-                contractAddrCol->Append(log.contractAddress);
-                eventNameCol->Append(log.eventName);
-                eventSigCol->Append(log.eventSignature);
-                signatureCol->Append(log.signature);
-                argsCol->Append(log.args);
+            // Execute an INSERT statement for each log record
+            for (const auto& log : decodedLogs) {
+                // Format the insert query with the log record
+                std::string insertQuery = queryConfig_.formatDecodedLogsInsertQuery(log);
+                
+                // Execute the insert query
+                client->Execute(insertQuery);
             }
-
-            block.AppendColumn("transactionHash", txHashCol);
-            block.AppendColumn("logIndex", logIndexCol);
-            block.AppendColumn("contractAddress", contractAddrCol);
-            block.AppendColumn("eventName", eventNameCol);
-            block.AppendColumn("eventSignature", eventSigCol);
-            block.AppendColumn("signature", signatureCol);
-            block.AppendColumn("args", argsCol);
-
-            client->Insert(queryConfig_.getDecodedLogsInsertTable(), block);
 
             client_.getPool()->returnConnection(client);
             return true;

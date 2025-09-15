@@ -1,4 +1,5 @@
 #include "include/clickhouse/clickhouse_query_config.h"
+#include "../../../ethereum_decoder/include/ethereum_decoder.h"
 #include <fstream>
 #include <sstream>
 #include <stdexcept>
@@ -9,10 +10,7 @@
 namespace decode_clickhouse {
 
 ClickHouseQueryConfig::ClickHouseQueryConfig()
-    : pageSize_(10000)
-    , logsTableName_("logs")
-    , contractsTableName_("decoded_contracts")
-    , decodedLogsTableName_("decoded_logs") {
+    : pageSize_(25000) {
     loadDefaults();
 }
 
@@ -25,19 +23,7 @@ void ClickHouseQueryConfig::loadFromFiles(const std::string& configDir) {
             nlohmann::json config;
             configFile >> config;
             
-            // Load table names
-            if (config.contains("tables")) {
-                auto tables = config["tables"];
-                if (tables.contains("logs")) {
-                    logsTableName_ = tables["logs"];
-                }
-                if (tables.contains("contracts")) {
-                    contractsTableName_ = tables["contracts"];
-                }
-                if (tables.contains("decoded_logs")) {
-                    decodedLogsTableName_ = tables["decoded_logs"];
-                }
-            }
+            // Table names are now defined in SQL files directly
             
             // Load pagination settings
             if (config.contains("pagination") && config["pagination"].contains("page_size")) {
@@ -52,6 +38,7 @@ void ClickHouseQueryConfig::loadFromFiles(const std::string& configDir) {
         // Load SQL queries from files
         logStreamQuery_ = loadFileContent(configDir + "log_stream.sql");
         contractABIQuery_ = loadFileContent(configDir + "contract_abi.sql");
+        decodedLogsInsertQuery_ = loadFileContent(configDir + "decoded_logs_insert.sql");
         
         // Load ClickHouse settings
         std::string settingsContent = loadFileContent(configDir + "clickhouse_settings.sql");
@@ -64,10 +51,6 @@ void ClickHouseQueryConfig::loadFromFiles(const std::string& configDir) {
             asyncInsertSettings_.push_back(line);
         }
         
-        // Replace table name placeholders
-        replaceTableNames();
-        
-        decodedLogsInsertTable_ = decodedLogsTableName_;
         
         spdlog::info("Loaded SQL queries from {}", configDir);
     } catch (const std::exception& e) {
@@ -79,8 +62,6 @@ void ClickHouseQueryConfig::loadFromFiles(const std::string& configDir) {
 void ClickHouseQueryConfig::loadDefaults() {
     initializeDefaultQueries();
     initializeDefaultSettings();
-    replaceTableNames();
-    decodedLogsInsertTable_ = decodedLogsTableName_;
 }
 
 std::string ClickHouseQueryConfig::formatLogStreamQuery(uint64_t startBlock, uint64_t endBlock, 
@@ -121,19 +102,70 @@ std::string ClickHouseQueryConfig::formatContractABIQuery(const std::string& add
     return query;
 }
 
+std::string ClickHouseQueryConfig::formatDecodedLogsInsertQuery(const ethereum_decoder::DecodedLogRecord& log) const {
+    std::string query = decodedLogsInsertQuery_;
+    
+    // Helper function to escape single quotes in strings
+    auto escapeString = [](const std::string& str) {
+        std::string escaped = str;
+        size_t pos = 0;
+        while ((pos = escaped.find("'", pos)) != std::string::npos) {
+            escaped.replace(pos, 1, "''");
+            pos += 2;
+        }
+        return escaped;
+    };
+    
+    // Replace placeholders with actual values
+    size_t pos;
+    while ((pos = query.find("{transactionHash}")) != std::string::npos) {
+        query.replace(pos, 17, escapeString(log.transactionHash));
+    }
+    while ((pos = query.find("{logIndex}")) != std::string::npos) {
+        query.replace(pos, 10, std::to_string(log.logIndex));
+    }
+    while ((pos = query.find("{contractAddress}")) != std::string::npos) {
+        query.replace(pos, 17, escapeString(log.contractAddress));
+    }
+    while ((pos = query.find("{eventName}")) != std::string::npos) {
+        query.replace(pos, 11, escapeString(log.eventName));
+    }
+    while ((pos = query.find("{eventSignature}")) != std::string::npos) {
+        query.replace(pos, 16, escapeString(log.eventSignature));
+    }
+    while ((pos = query.find("{signature}")) != std::string::npos) {
+        query.replace(pos, 11, escapeString(log.signature));
+    }
+    while ((pos = query.find("{args}")) != std::string::npos) {
+        query.replace(pos, 6, escapeString(log.args));
+    }
+    
+    return query;
+}
+
 void ClickHouseQueryConfig::initializeDefaultQueries() {
     logStreamQuery_ = R"(SELECT transactionHash, blockNumber, address, data, logIndex,
        topic0, topic1, topic2, topic3
-FROM {LOGS_TABLE}
+FROM logs
 WHERE blockNumber >= {START_BLOCK} AND blockNumber <= {END_BLOCK}
   AND removed = 0
 ORDER BY blockNumber, logIndex
 LIMIT {PAGE_SIZE} OFFSET {OFFSET})";
 
     contractABIQuery_ = R"(SELECT ADDRESS, NAME, ABI, IMPLEMENTATION_ADDRESS
-FROM {CONTRACTS_TABLE}
+FROM decoded_contracts
 WHERE (ADDRESS IN ({ADDRESS_LIST}) OR IMPLEMENTATION_ADDRESS IN ({ADDRESS_LIST}))
   AND ABI != '' AND ABI IS NOT NULL)";
+
+    decodedLogsInsertQuery_ = R"(INSERT INTO decoded_logs (
+    transactionHash,
+    logIndex,
+    contractAddress,
+    eventName,
+    eventSignature,
+    signature,
+    args
+) VALUES ('{transactionHash}', {logIndex}, '{contractAddress}', '{eventName}', '{eventSignature}', '{signature}', '{args}'))";
 }
 
 void ClickHouseQueryConfig::initializeDefaultSettings() {
@@ -157,19 +189,5 @@ std::string ClickHouseQueryConfig::loadFileContent(const std::string& filepath) 
     return ss.str();
 }
 
-void ClickHouseQueryConfig::replaceTableNames() {
-    // Replace table name placeholders in queries
-    size_t pos;
-    
-    // Replace in log stream query
-    while ((pos = logStreamQuery_.find("{LOGS_TABLE}")) != std::string::npos) {
-        logStreamQuery_.replace(pos, 12, logsTableName_);
-    }
-    
-    // Replace in contract ABI query  
-    while ((pos = contractABIQuery_.find("{CONTRACTS_TABLE}")) != std::string::npos) {
-        contractABIQuery_.replace(pos, 17, contractsTableName_);
-    }
-}
 
 } // namespace decode_clickhouse

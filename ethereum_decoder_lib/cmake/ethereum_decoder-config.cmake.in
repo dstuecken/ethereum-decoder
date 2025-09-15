@@ -1,0 +1,17 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+
+# Find dependencies
+find_dependency(nlohmann_json 3.0)
+find_dependency(spdlog)
+
+# Include the targets file
+include("${CMAKE_CURRENT_LIST_DIR}/ethereum_decoder-targets.cmake")
+
+# Provide the ethereum_decoder::ethereum_decoder target
+if(TARGET ethereum_decoder::static AND NOT TARGET ethereum_decoder::ethereum_decoder)
+    add_library(ethereum_decoder::ethereum_decoder ALIAS ethereum_decoder::static)
+elseif(TARGET ethereum_decoder::shared AND NOT TARGET ethereum_decoder::ethereum_decoder)
+    add_library(ethereum_decoder::ethereum_decoder ALIAS ethereum_decoder::shared)
+endif()

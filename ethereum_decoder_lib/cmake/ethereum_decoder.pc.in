@@ -1,0 +1,12 @@
+prefix=@CMAKE_INSTALL_PREFIX@
+exec_prefix=${prefix}
+libdir=${exec_prefix}/@CMAKE_INSTALL_LIBDIR@
+includedir=${prefix}/@CMAKE_INSTALL_INCLUDEDIR@
+
+Name: ethereum_decoder
+Description: C++ library for decoding Ethereum logs and transactions
+Version: @PROJECT_VERSION@
+URL: https://github.com/dstuecken/ethereum-decoder
+Requires: nlohmann_json spdlog
+Libs: -L${libdir} -lethereum_decoder
+Cflags: -I${includedir}/ethereum_decoder

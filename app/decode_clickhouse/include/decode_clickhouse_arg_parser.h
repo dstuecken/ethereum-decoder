@@ -26,6 +26,7 @@ struct ClickHouseArgs {
     std::string outputDir = "decoded_logs";  // Default output directory for parquet/json files
     bool useJsonOutput = false;  // Default is parquet (if available), use --json to force JSON output
     std::string logLevel = "info";  // Default log level: debug, info, warning, error
+    size_t logsPageSize = 25000;  // Default page size for fetching logs
 };
 
 class DecodeClickhouseArgParser {

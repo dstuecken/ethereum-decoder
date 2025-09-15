@@ -90,9 +90,13 @@ int run(int argc, char *argv[]) {
         spdlog::info("Output format: {}", args.useJsonOutput ? "JSON" : "Parquet");
         spdlog::info("Log file: {}", args.logFile);
         spdlog::info("Log level: {}", args.logLevel);
+        spdlog::info("Logs page size: {}", args.logsPageSize);
 
         decode_clickhouse::ClickHouseClient clickhouseClient(args.config);
         decode_clickhouse::ClickHouseEthereum ethereum(clickhouseClient);
+        
+        // Configure page size from command line arguments
+        ethereum.getQueryConfig().setPageSize(args.logsPageSize);
 
         try {
             if (!clickhouseClient.testConnection()) {

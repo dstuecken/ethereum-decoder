@@ -6,13 +6,13 @@
 namespace ethereum_decoder {
 
 std::string Keccak256::hash(const std::string& input) {
-    std::vector<uint8_t> hashBytes = hashBytes(input);
-    return Utils::bytesToHex(hashBytes);
+    std::vector<uint8_t> bytes = hashBytes(input);
+    return Utils::bytesToHex(bytes);
 }
 
 std::string Keccak256::hash(const std::vector<uint8_t>& input) {
-    std::vector<uint8_t> hashBytes = hashBytes(input);
-    return Utils::bytesToHex(hashBytes);
+    std::vector<uint8_t> bytes = hashBytes(input);
+    return Utils::bytesToHex(bytes);
 }
 
 std::vector<uint8_t> Keccak256::hashBytes(const std::string& input) {

@@ -58,6 +58,11 @@ ClickHouseArgs DecodeClickhouseArgParser::parse(int argc, char *argv[]) {
                 throw std::runtime_error("Invalid log level: " + args.logLevel + 
                                        ". Must be one of: debug, info, warning, error");
             }
+        } else if (arg == "--logs-page-size" && i + 1 < argc) {
+            args.logsPageSize = std::stoi(argv[++i]);
+            if (args.logsPageSize < 100) {
+                throw std::runtime_error("Logs page size must be at least 100");
+            }
         } else {
             throw std::runtime_error("Unknown argument: " + arg);
         }
@@ -99,6 +104,7 @@ void DecodeClickhouseArgParser::printUsage(const char *programName) const {
     std::cout << "  --output-dir <dir>      Output directory for decoded logs (default: decoded_logs)" << std::endl;
     std::cout << "  --json                  Output in JSON format instead of Parquet (default: Parquet if available)" << std::endl;
     std::cout << "  --log-level <level>     Set log verbosity: debug, info, warning, error (default: info)" << std::endl;
+    std::cout << "  --logs-page-size <size> Number of logs to fetch per page (default: 25000)" << std::endl;
     std::cout << "  --help, -h              Show this help message" << std::endl;
     std::cout << "\nExample:" << std::endl;
     std::cout << "  " << programName << " \\" << std::endl;

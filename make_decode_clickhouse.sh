@@ -16,8 +16,8 @@ NLOHMANN_JSON_DIR="$DEPS_DIR/nlohmann-json"
 CLICKHOUSE_CPP_DIR="$DEPS_DIR/clickhouse-cpp"
 ABSEIL_DIR="$DEPS_DIR/abseil-cpp"
 
-# Parquet support (optional) - set ENABLE_PARQUET=1 to enable
-if [[ "$ENABLE_PARQUET" == "1" ]]; then
+# Parquet support (enabled by default) - set DISABLE_PARQUET=1 to disable
+if [[ "$DISABLE_PARQUET" != "1" ]]; then
     ARROW_DIR="$DEPS_DIR/arrow"
     
     # Check for pre-built parquet library from system or manual install
@@ -30,19 +30,29 @@ if [[ "$ENABLE_PARQUET" == "1" ]]; then
         echo "Using locally built Arrow/Parquet libraries"
         PARQUET_CFLAGS="-DENABLE_PARQUET -I$ARROW_DIR/cpp/src -I$ARROW_DIR/cpp/build/src"
         # Check if thrift library exists and add it to link flags
-        if [[ -f "$ARROW_DIR/cpp/build/thrift_ep-install/lib/libthrift.a" ]]; then
-            PARQUET_LDFLAGS="-L$ARROW_DIR/cpp/build/release -L$ARROW_DIR/cpp/build/thrift_ep-install/lib -larrow -lparquet -lthrift"
+        # Also add required system libraries for Arrow: zlib and mimalloc
+        if [[ -f "$ARROW_DIR/cpp/build/lib/libthrift.a" ]]; then
+            PARQUET_LDFLAGS="-L$ARROW_DIR/cpp/build/release -L$ARROW_DIR/cpp/build/lib -larrow -lparquet -lthrift -lz"
+        elif [[ -f "$ARROW_DIR/cpp/build/thrift_ep-install/lib/libthrift.a" ]]; then
+            PARQUET_LDFLAGS="-L$ARROW_DIR/cpp/build/release -L$ARROW_DIR/cpp/build/thrift_ep-install/lib -larrow -lparquet -lthrift -lz"
         else
-            PARQUET_LDFLAGS="-L$ARROW_DIR/cpp/build/release -larrow -lparquet"
+            echo "Warning: Thrift library not found, linking without it (may cause issues)"
+            PARQUET_LDFLAGS="-L$ARROW_DIR/cpp/build/release -larrow -lparquet -lz"
+        fi
+        
+        # Add mimalloc if it was built with Arrow
+        if [[ -f "$ARROW_DIR/cpp/build/mimalloc_ep/src/mimalloc_ep/lib/mimalloc-2.2/libmimalloc.a" ]]; then
+            PARQUET_LDFLAGS="$PARQUET_LDFLAGS -L$ARROW_DIR/cpp/build/mimalloc_ep/src/mimalloc_ep/lib/mimalloc-2.2 -lmimalloc"
         fi
     else
         echo ""
-        echo "WARNING: Parquet support requested but libparquet.a not found."
+        echo "WARNING: Parquet support is enabled by default but libparquet.a not found."
         echo "The Parquet library requires Apache Thrift which has compatibility issues."
         echo ""
         echo "Options to enable Parquet support:"
         echo "1. Install Arrow/Parquet via Homebrew: brew install apache-arrow"
         echo "2. Build manually with compatible Thrift version"
+        echo "3. Disable Parquet support: DISABLE_PARQUET=1 ./make_decode_clickhouse.sh"
         echo ""
         echo "Continuing without Parquet support (JSON output will be used instead)..."
         echo ""
@@ -50,6 +60,7 @@ if [[ "$ENABLE_PARQUET" == "1" ]]; then
         PARQUET_LDFLAGS=""
     fi
 else
+    echo "Parquet support disabled via DISABLE_PARQUET=1"
     PARQUET_CFLAGS=""
     PARQUET_LDFLAGS=""
 fi
